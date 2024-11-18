@@ -764,7 +764,7 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       0,
       NULL },
 
-#if (A7_NGX_SSL_NTLS)
+#if (AS_NGX_SSL_NTLS)
     { ngx_string("proxy_enable_ntls"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_set_complex_value_slot,
@@ -3378,7 +3378,7 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->ssl_verify_depth = NGX_CONF_UNSET_UINT;
     conf->ssl_passwords = NGX_CONF_UNSET_PTR;
 
-#if (A7_NGX_SSL_NTLS)
+#if (AS_NGX_SSL_NTLS)
     conf->upstream.tls_method = NULL;
     conf->upstream.enable_ntls = NULL;
 #endif
@@ -3727,7 +3727,7 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->ssl_certificate_key, "");
     ngx_conf_merge_ptr_value(conf->ssl_passwords, prev->ssl_passwords, NULL);
 
-#if (A7_NGX_SSL_NTLS)
+#if (AS_NGX_SSL_NTLS)
     if (conf->upstream.enable_ntls == NULL) {
         conf->upstream.enable_ntls = prev->upstream.enable_ntls;
     }
