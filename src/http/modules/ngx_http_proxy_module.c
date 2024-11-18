@@ -764,6 +764,42 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       0,
       NULL },
 
+#if (A7_NGX_SSL_NTLS)
+    { ngx_string("proxy_enable_ntls"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_set_complex_value_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.enable_ntls),
+      NULL },
+
+    { ngx_string("proxy_ssl_enc_certificate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.enc_certificate),
+      NULL },
+
+    { ngx_string("proxy_ssl_enc_certificate_key"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.enc_certificate_key),
+      NULL },
+
+    { ngx_string("proxy_ssl_sign_certificate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.sign_certificate),
+      NULL },
+
+    { ngx_string("proxy_ssl_sign_certificate_key"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.sign_certificate_key),
+      NULL },
+#endif
 #endif
 
       ngx_null_command
@@ -3341,6 +3377,11 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.ssl_verify = NGX_CONF_UNSET;
     conf->ssl_verify_depth = NGX_CONF_UNSET_UINT;
     conf->ssl_passwords = NGX_CONF_UNSET_PTR;
+
+#if (A7_NGX_SSL_NTLS)
+    conf->upstream.tls_method = NULL;
+    conf->upstream.enable_ntls = NULL;
+#endif
 #endif
 
     /* "proxy_cyclic_temp_file" is disabled */
@@ -3685,6 +3726,22 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->ssl_certificate_key,
                               prev->ssl_certificate_key, "");
     ngx_conf_merge_ptr_value(conf->ssl_passwords, prev->ssl_passwords, NULL);
+
+#if (A7_NGX_SSL_NTLS)
+    if (conf->upstream.enable_ntls == NULL) {
+        conf->upstream.enable_ntls = prev->upstream.enable_ntls;
+    }
+    ngx_conf_merge_str_value(conf->upstream.enc_certificate,
+                             prev->upstream.enc_certificate, "");
+    ngx_conf_merge_str_value(conf->upstream.enc_certificate_key,
+                             prev->upstream.enc_certificate_key, "");
+    ngx_conf_merge_str_value(conf->upstream.sign_certificate,
+                             prev->upstream.sign_certificate, "");
+    ngx_conf_merge_str_value(conf->upstream.sign_certificate_key,
+                             prev->upstream.sign_certificate_key, "");
+    conf->upstream.ssl_ciphers = conf->ssl_ciphers;
+    conf->upstream.ssl_passwords = conf->ssl_passwords;
+#endif
 
     if (conf->ssl && ngx_http_proxy_set_ssl(cf, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -4886,6 +4943,94 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
             return NGX_ERROR;
         }
     }
+
+#if (AS_NGX_SSL_NTLS)
+    else if(plcf->upstream.enc_certificate.len && plcf->upstream.sign_certificate.len) {
+        plcf->upstream.tls_method = SSL_CTX_get_ssl_method(plcf->upstream.ssl->ctx);
+        if (ngx_http_script_variables_count(&plcf->upstream.enc_certificate) ||
+            ngx_http_script_variables_count(&plcf->upstream.sign_certificate))
+        {
+            ngx_http_complex_value_t          *cv;
+            ngx_http_compile_complex_value_t   ccv;
+
+            cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+            if (cv == NULL) {
+                return NGX_ERROR;
+            }
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+            ccv.cf = cf;
+            ccv.value = &plcf->upstream.enc_certificate;
+            ccv.complex_value = cv;
+            ccv.zero = 1;
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_ERROR;
+            }
+            plcf->upstream.enc_certificate_value = cv;
+
+            cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+            if (cv == NULL) {
+                return NGX_ERROR;
+            }
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+            ccv.cf = cf;
+            ccv.value = &plcf->upstream.enc_certificate_key;
+            ccv.complex_value = cv;
+            ccv.zero = 1;
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_ERROR;
+            }
+            plcf->upstream.enc_certificate_key_value = cv;
+
+            cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+            if (cv == NULL) {
+                return NGX_ERROR;
+            }
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+            ccv.cf = cf;
+            ccv.value = &plcf->upstream.sign_certificate;
+            ccv.complex_value = cv;
+            ccv.zero = 1;
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_ERROR;
+            }
+            plcf->upstream.sign_certificate_value = cv;
+
+            cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+            if (cv == NULL) {
+                return NGX_ERROR;
+            }
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+            ccv.cf = cf;
+            ccv.value = &plcf->upstream.sign_certificate_key;
+            ccv.complex_value = cv;
+            ccv.zero = 1;
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_ERROR;
+            }
+            plcf->upstream.sign_certificate_key_value = cv;
+        }
+
+        if (plcf->upstream.enc_certificate_value == NULL ||
+            plcf->upstream.sign_certificate_value == NULL)
+        {
+            if (ngx_ssl_certificate(cf, plcf->upstream.ssl,
+                                &plcf->upstream.enc_certificate,
+                                &plcf->upstream.enc_certificate_key,
+                                plcf->ssl_passwords) != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+
+            if (ngx_ssl_certificate(cf, plcf->upstream.ssl,
+                                    &plcf->upstream.sign_certificate,
+                                    &plcf->upstream.sign_certificate_key,
+                                    plcf->ssl_passwords) != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+        }
+    }
+#endif
 
     if (ngx_ssl_ciphers(cf, plcf->upstream.ssl, &plcf->ssl_ciphers, 0)
         != NGX_OK)

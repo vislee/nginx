@@ -1661,6 +1661,32 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
         return;
     }
 
+#if (AS_NGX_SSL_NTLS)
+    ngx_flag_t                  sm2 = 0;
+    if (u->conf->enable_ntls) {
+        ngx_str_t               enable_ntls;
+        if (ngx_http_complex_value(r, u->conf->enable_ntls,
+            &enable_ntls) == NGX_OK && enable_ntls.len == 2 &&
+            ngx_strncmp(enable_ntls.data, "on", 2) == 0)
+        {
+            if (u->conf->tls_method != NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, NTLS_method());
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_enable_ntls(u->conf->ssl->ctx);
+                sm2 = 1;
+            }
+        } else {
+            if (SSL_CTX_get_ssl_method(u->conf->ssl->ctx) == NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, u->conf->tls_method);
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_disable_ntls(u->conf->ssl->ctx);
+            }
+        }
+    }
+#endif
+
     if (ngx_ssl_create_connection(u->conf->ssl, c,
                                   NGX_SSL_BUFFER|NGX_SSL_CLIENT)
         != NGX_OK)
@@ -1680,6 +1706,48 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
             return;
         }
     }
+
+
+#if (AS_NGX_SSL_NTLS)
+    if (sm2 && u->conf->enc_certificate_value)
+    {
+        ngx_str_t  enc, enc_key, sign, sign_key;
+
+        if (ngx_http_complex_value(r, u->conf->enc_certificate_value, &enc)
+            != NGX_OK)
+        {
+            return;
+        }
+        if (ngx_http_complex_value(r, u->conf->enc_certificate_key_value,
+            &enc_key) != NGX_OK)
+        {
+            return;
+        }
+
+        if (ngx_ssl_connection_certificate(c, r->pool, &enc, &enc_key,
+            u->conf->ssl_passwords) != NGX_OK)
+        {
+            return;
+        }
+
+        if (ngx_http_complex_value(r, u->conf->sign_certificate_value, &sign)
+            != NGX_OK)
+        {
+            return;
+        }
+        if (ngx_http_complex_value(r, u->conf->sign_certificate_key_value,
+            &sign_key) != NGX_OK)
+        {
+            return;
+        }
+
+        if (ngx_ssl_connection_certificate(c, r->pool, &sign, &sign_key,
+            u->conf->ssl_passwords) != NGX_OK)
+        {
+            return;
+        }
+    }
+#endif
 
     if (u->conf->ssl_session_reuse) {
         c->ssl->save_session = ngx_http_upstream_ssl_save_session;

@@ -437,6 +437,42 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_ERROR;
     }
 
+#if (AS_NGX_SSL_NTLS)
+#ifndef OPENSSL_NO_NTLS
+    ngx_flag_t   sm2_sign = 0;
+    ngx_flag_t   sm2_enc = 0;
+
+    if (EVP_PKEY_is_sm2(X509_get0_pubkey(x509)))
+    {
+        if (X509_get_key_usage(x509) & X509v3_KU_DIGITAL_SIGNATURE) {
+            sm2_sign = 1;
+        }
+        else {
+            sm2_enc = 1;
+        }
+    }
+
+    if (sm2_sign) {
+        if (SSL_CTX_use_sign_certificate(ssl->ctx, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                        "SSL_CTX_use_sign_certificate(\"%s\") failed", cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+    }
+    else if(sm2_enc) {
+        if (SSL_CTX_use_enc_certificate(ssl->ctx, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                        "SSL_CTX_use_enc_certificate(\"%s\") failed", cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+    } else
+#endif
+#endif
+
     if (SSL_CTX_use_certificate(ssl->ctx, x509) == 0) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_certificate(\"%s\") failed", cert->data);
@@ -525,6 +561,27 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_ERROR;
     }
 
+#if (AS_NGX_SSL_NTLS)
+#ifndef OPENSSL_NO_NTLS
+    if (sm2_sign) {
+        if (SSL_CTX_use_sign_PrivateKey(ssl->ctx, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                        "SSL_CTX_use_sign_PrivateKey(\"%s\") failed", key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+    }
+    else if(sm2_enc) {
+        if (SSL_CTX_use_enc_PrivateKey(ssl->ctx, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                        "SSL_CTX_use_enc_PrivateKey(\"%s\") failed", key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+    } else
+#endif
+#endif
+
     if (SSL_CTX_use_PrivateKey(ssl->ctx, pkey) == 0) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_PrivateKey(\"%s\") failed", key->data);
@@ -557,6 +614,41 @@ ngx_ssl_connection_certificate(ngx_connection_t *c, ngx_pool_t *pool,
 
         return NGX_ERROR;
     }
+
+#if (AS_NGX_SSL_NTLS)
+#ifndef OPENSSL_NO_NTLS
+    ngx_flag_t   sm2_sign = 0;
+    ngx_flag_t   sm2_enc = 0;
+
+    if (EVP_PKEY_is_sm2(X509_get0_pubkey(x509))) {
+        if (X509_get_key_usage(x509) & X509v3_KU_DIGITAL_SIGNATURE) {
+            sm2_sign = 1;
+        }
+        else {
+            sm2_enc = 1;
+        }
+    }
+
+    if (sm2_sign) {
+        if (SSL_use_sign_certificate(c->ssl->connection, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, c->log, 0,
+                        "SSL_use_sign_certificate(\"%s\") failed", cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+    }
+    else if(sm2_enc) {
+        if (SSL_use_enc_certificate(c->ssl->connection, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, c->log, 0,
+                        "SSL_use_enc_certificate(\"%s\") failed", cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+    } else
+#endif
+#endif
 
     if (SSL_use_certificate(c->ssl->connection, x509) == 0) {
         ngx_ssl_error(NGX_LOG_ERR, c->log, 0,
@@ -595,6 +687,27 @@ ngx_ssl_connection_certificate(ngx_connection_t *c, ngx_pool_t *pool,
 
         return NGX_ERROR;
     }
+
+#if (AS_NGX_SSL_NTLS)
+#ifndef OPENSSL_NO_NTLS
+    if (sm2_sign) {
+        if (SSL_use_sign_PrivateKey(c->ssl->connection, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, c->log, 0,
+                        "SSL_use_sign_PrivateKey(\"%s\") failed", key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+    }
+    else if(sm2_enc) {
+        if (SSL_use_enc_PrivateKey(c->ssl->connection, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, c->log, 0,
+                        "SSL_use_enc_PrivateKey(\"%s\") failed", key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+    } else
+#endif
+#endif
 
     if (SSL_use_PrivateKey(c->ssl->connection, pkey) == 0) {
         ngx_ssl_error(NGX_LOG_ERR, c->log, 0,
