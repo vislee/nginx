@@ -1675,6 +1675,8 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
                                         (char *)u->conf->ssl_ciphers.data);
                 SSL_CTX_enable_ntls(u->conf->ssl->ctx);
                 sm2 = 1;
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http upstream enable ntls");
             }
         } else {
             if (SSL_CTX_get_ssl_method(u->conf->ssl->ctx) == NTLS_method()) {
@@ -1746,6 +1748,13 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
         {
             return;
         }
+
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "set sm2 enc: \"%V\" \
+                       enc_key: \"%V\" \
+                       sign: \"%V\" \
+                       sign_key: \"%V\"",
+                       &enc, &enc_key, &sign, &sign_key);
     }
 #endif
 
