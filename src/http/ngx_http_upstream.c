@@ -1669,12 +1669,12 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
             &enable_ntls) == NGX_OK && enable_ntls.len == 2 &&
             ngx_strncmp(enable_ntls.data, "on", 2) == 0)
         {
+            sm2 = 1;
             if (u->conf->tls_method != NTLS_method()) {
                 SSL_CTX_set_ssl_version(u->conf->ssl->ctx, NTLS_method());
                 SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
                                         (char *)u->conf->ssl_ciphers.data);
                 SSL_CTX_enable_ntls(u->conf->ssl->ctx);
-                sm2 = 1;
                 ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http upstream enable ntls");
             }

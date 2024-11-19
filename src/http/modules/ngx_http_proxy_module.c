@@ -4946,7 +4946,6 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
 
 #if (AS_NGX_SSL_NTLS)
     else if(plcf->upstream.enc_certificate.len && plcf->upstream.sign_certificate.len) {
-        plcf->upstream.tls_method = SSL_CTX_get_ssl_method(plcf->upstream.ssl->ctx);
         if (ngx_http_script_variables_count(&plcf->upstream.enc_certificate) ||
             ngx_http_script_variables_count(&plcf->upstream.sign_certificate))
         {
@@ -5030,6 +5029,7 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
             }
         }
     }
+    plcf->upstream.tls_method = SSL_CTX_get_ssl_method(plcf->upstream.ssl->ctx);
 #endif
 
     if (ngx_ssl_ciphers(cf, plcf->upstream.ssl, &plcf->ssl_ciphers, 0)
