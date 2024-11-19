@@ -1749,12 +1749,10 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
             return;
         }
 
-        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "set sm2 enc: \"%V\" \
-                       enc_key: \"%V\" \
-                       sign: \"%V\" \
-                       sign_key: \"%V\"",
-                       &enc, &enc_key, &sign, &sign_key);
+        ngx_log_debug8(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+            "set sm2 enc: %*s; enc_key: %*s; sign: %*s; sign_key: %*s;",
+            enc.len-1, enc.data, enc_key.len-1, enc_key.data,
+            sign.len-1, sign.data, sign_key.len-1, sign_key.data);
     }
 #endif
 
